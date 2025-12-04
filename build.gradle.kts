@@ -15,8 +15,7 @@ java {
 sourceSets {
     main {
         java {
-            srcDir(
-                "${project.layout.buildDirectory.get().asFile}/generated/jextract")
+            srcDir("${project.layout.buildDirectory.get().asFile}/generated/jextract")
         }
     }
 }
@@ -24,6 +23,9 @@ sourceSets {
 
 repositories {
     mavenCentral()
+    maven {
+        url = uri("https://maven.pkg.github.com/tringh/java-llama-cpp-capi")
+    }
 }
 
 tasks.register<Exec>("compileNative") {
@@ -66,12 +68,6 @@ tasks.withType<Test> {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
 }
 
-dependencies {
-    testImplementation(platform("org.junit:junit-bom:5.10.0"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
-
 tasks.test {
     useJUnitPlatform()
 }
@@ -94,4 +90,44 @@ publishing {
             }
         }
     }
+}
+
+val integrationTest by sourceSets.creating {
+    compileClasspath += sourceSets["main"].output
+    runtimeClasspath += sourceSets["main"].output
+}
+
+configurations {
+    named("integrationTestImplementation") {
+        extendsFrom(configurations["testImplementation"])
+    }
+    named("integrationTestRuntimeOnly") {
+        extendsFrom(configurations["testRuntimeOnly"])
+    }
+    named("integrationTestCompileOnly") {
+        extendsFrom(configurations["testCompileOnly"])
+    }
+}
+
+tasks.register<Test>("integrationTest") {
+    description = "Run integration tests"
+    group = "verification"
+
+    testClassesDirs = sourceSets["integrationTest"].output.classesDirs
+    classpath = sourceSets["integrationTest"].runtimeClasspath
+
+    useJUnitPlatform()
+}
+
+dependencies {
+    testImplementation(platform("org.junit:junit-bom:5.10.0"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    testCompileOnly("org.slf4j:slf4j-api:2.0.17")
+
+    testRuntimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.25.2")
+
+    add("integrationTestImplementation",
+        "io.github.tringh.jallama:java-llama-cpp-capi:0.0.1")
 }
