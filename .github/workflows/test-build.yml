@@ -10,6 +10,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           clean: false
+          fetch-depth: 0
+          submodules: recursive
       - name: Run Build Script
         run: |
           chmod +x scripts/build_corelib.sh
