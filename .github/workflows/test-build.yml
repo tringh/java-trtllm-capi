@@ -1,0 +1,16 @@
+name: Test Runner
+
+on: [push]
+
+jobs:
+  smoke-test:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Run Build Script
+        run: |
+          chmod +x scripts/build_corelib.sh
+          ./scripts/build_corelib.sh
