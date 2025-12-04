@@ -4,7 +4,6 @@ import io.github.tringh.jallama.trtllm.internal.trtllm_capi_h;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
-import java.util.Arrays;
 
 public class LlmResponseList extends NativeObject implements AutoCloseable {
     public LlmResponseList(MemorySegment self) {
