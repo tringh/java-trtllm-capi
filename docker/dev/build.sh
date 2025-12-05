@@ -6,7 +6,7 @@ set -e
 # ==============================================================================
 # Default to a specific tag if not provided. 
 # "v0.15.0" is a common stable tag for trt-llm, but you can use "latest" if preferred.
-TRT_VER="${1:-latest}" 
+TRT_VER="1.0.0" 
 
 # Java Tool Versions
 IDEA_VER="2025.2.4"
@@ -16,7 +16,8 @@ JEXTRACT_VER="22-6"
 
 # Image Tagging
 IMAGE_NAME="htring/java-trtllm-dev"
-TAG="${IMAGE_NAME}:${TRT_VER}"
+IMAGE_VER="0.0.1"
+TAG="${IMAGE_NAME}:${IMAGE_VER}"
 
 # ==============================================================================
 # Build Execution

@@ -88,7 +88,11 @@ COPY --from=builder /tmp/jdk-21.deb /tmp/jdk-21.deb
 RUN dpkg -i /tmp/jdk-25.deb && \
     dpkg -i /tmp/jdk-22.deb && \
     dpkg -i /tmp/jdk-21.deb && \
-    rm /tmp/jdk-*.deb
+    rm -f /tmp/jdk-*.deb && \
+    ln -s "$(find /usr/lib/jvm -maxdepth 1 -name 'jdk-25.*' -type d | head -n 1)" /usr/lib/jvm/jdk-25 && \
+    ln -s "$(find /usr/lib/jvm -maxdepth 1 -name 'jdk-22.*' -type d | head -n 1)" /usr/lib/jvm/jdk-22 && \
+    ln -s "$(find /usr/lib/jvm -maxdepth 1 -name 'jdk-21.*' -type d | head -n 1)" /usr/lib/jvm/jdk-21 && \
+    ls -ld /usr/lib/jvm/jdk-25/bin/java
 
 # --- 3. Install Build Tools (Maven, Gradle, JExtract) ---
 COPY --from=builder /opt/gradle /opt/gradle
@@ -146,10 +150,7 @@ RUN cd /home/developer/actions-runner && \
 # Set proper ownership
 RUN chown -R developer:developer /home/developer
 
-# --- 9. Setup Working Directory ---
-RUN mkdir -p /code && chown developer:developer /code
-
-# --- 10. Entrypoint Setup ---
+# --- 9. Entrypoint Setup ---
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 

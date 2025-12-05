@@ -11,4 +11,4 @@ docker run -d \
   -v ../trtllm_data:/data \
   -v ~/.gradle:/home/developer/.gradle \
   --name java-trtllm-capi-dev \
-  htring/java-trtllm-dev:1.0.0
+  htring/java-trtllm-dev:0.0.1
