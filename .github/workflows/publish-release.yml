@@ -1,0 +1,48 @@
+name: Release Publisher
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-package-publish:
+    runs-on: self-hosted
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          clean: false
+          fetch-depth: 0
+          submodules: recursive
+      - name: Build Native Libraries
+        run: |
+          chmod +x scripts/build_corelib.sh
+          ./scripts/build_corelib.sh
+      - name: Build Jar
+        run: |
+          gradle jar
+      - name: Package Artifacts
+        run: |
+          mkdir -p dist/java-trtllm-capi/lib
+          find core/tensorrt-llm/cpp/build/tensorrt_llm -name "*.so" -exec cp -v {} dist/java-trtllm-capi/lib/ \;
+          ls -lh dist/java-trtllm-capi/lib
+          cp build/libs/*.jar dist/java-trtllm-capi
+          cd dist
+          tar -czvf java-trtllm-capi-${{ github.ref_name }}.tar.gz java-trtllm-capi/
+      - name: Upload to Release Page
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: dist/*.tar.gz
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Maven Package
+        run: gradle publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
