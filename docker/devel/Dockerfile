@@ -1,5 +1,5 @@
 # [GLOBAL ARG]
-ARG TRT_LLM_VERSION=latest
+ARG TRT_LLM_VERSION=1.0.0
 
 # =================================================================================================
 # STAGE 1: Builder
