@@ -17,7 +17,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -38,16 +37,15 @@ jobs:
           context: .
           file: docker/devel/Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   test-container:
     needs: build-and-push
     runs-on: ubuntu-latest
-
     container:
-      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
