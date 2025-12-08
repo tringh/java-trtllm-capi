@@ -60,16 +60,43 @@ jobs:
   test-container:
     needs: build-and-push
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/${{ github.repository_owner }}/java-trtllm-devel:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Maximize Build Space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 2048
+          swap-size-mb: 1024
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+          build-mount-path: '/var/lib/docker' # Crucial: This ensures the image pull goes to the large disk
+
+      - name: Restart Docker
+        run: |
+          sudo service docker restart
+          docker system df
+          df -h
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull Docker Image
+        run: docker pull ghcr.io/${{ github.repository_owner }}/java-trtllm-devel:latest
+
       - name: Check Java Version
-        run: java -version
+        run: |
+          docker run --rm \
+            ghcr.io/${{ github.repository_owner }}/java-trtllm-devel:latest \
+            java -version
 
       - name: Verify Environment
         run: |
-          echo "Displaying OS info..."
-          cat /etc/os-release
+          docker run --rm \
+            ghcr.io/${{ github.repository_owner }}/java-trtllm-devel:latest \
+            bash -c "echo 'Displaying OS info...' && cat /etc/os-release"
