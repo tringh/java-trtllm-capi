@@ -20,21 +20,58 @@ ENV MAVEN_VERSION=${MAVEN_VERSION}
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     curl ca-certificates tar unzip wget gnupg2 && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# --- Download and Extract IntelliJ IDEA ---
+# --- Download and Extract IntelliJ IDEA Ultimate (Remote Server Only) ---
 ARG IDEA_INSTALL_DIR=/opt/jetbrains/idea
 RUN mkdir -p ${IDEA_INSTALL_DIR}
 RUN curl -L "https://download.jetbrains.com/idea/ideaIU-${IDEA_VERSION}.tar.gz" | \
-    tar -xz -C ${IDEA_INSTALL_DIR} --strip-components=1
+    tar -xz -C ${IDEA_INSTALL_DIR} --strip-components=1 && \
+    # Remove UI-related components (keep only remote-dev-server)
+    cd ${IDEA_INSTALL_DIR} && \
+    # Remove all plugins except essential ones for remote development
+    find plugins/ -mindepth 1 -maxdepth 1 ! -name 'java' \
+                                          ! -name 'java-ide-customization' \
+                                          ! -name 'gradle' \
+                                          ! -name 'gradle-java' \
+                                          ! -name 'maven' \
+                                          ! -name 'remote-dev-server' \
+                                          ! -name 'git4idea' \
+                                          -exec rm -rf {} + 2>/dev/null || true && \
+    # Remove unnecessary binaries and UI components
+    rm -rf jbr/lib/libawt_xawt.* \
+           jbr/lib/libfontmanager.* \
+           jbr/lib/libjavafx*.* \
+           jbr/lib/libjawt.* \
+           lib/src.zip \
+           lib/*.zip \
+           license/ \
+           Install-Linux-tar.txt \
+           build.txt && \
+    # Remove source JARs from remaining plugins
+    find plugins/ -name "*-src.jar" -delete && \
+    find plugins/ -name "sources.jar" -delete && \
+    # Remove documentation
+    find . -name "*.pdf" -delete && \
+    find . -name "*.md" -delete && \
+    find . -name "*.html" -delete 2>/dev/null || true
 
-# --- Download and Extract Gradle ---
+# --- Download and Extract Gradle (bin distribution only) ---
 ARG GRADLE_INSTALL_DIR=/opt/gradle
 RUN mkdir -p ${GRADLE_INSTALL_DIR} && \
-    curl -L "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-all.zip" -o /tmp/gradle.zip && \
+    curl -L "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip && \
     unzip -q /tmp/gradle.zip -d /tmp && \
     mv /tmp/gradle-${GRADLE_VERSION}/* ${GRADLE_INSTALL_DIR}/ && \
-    rm -rf /tmp/gradle.zip /tmp/gradle-${GRADLE_VERSION}
+    rm -rf /tmp/gradle.zip /tmp/gradle-${GRADLE_VERSION} && \
+    # Remove docs and samples
+    rm -rf ${GRADLE_INSTALL_DIR}/docs \
+           ${GRADLE_INSTALL_DIR}/samples \
+           ${GRADLE_INSTALL_DIR}/src \
+           ${GRADLE_INSTALL_DIR}/getting-started.html \
+           ${GRADLE_INSTALL_DIR}/README \
+           ${GRADLE_INSTALL_DIR}/LICENSE \
+           ${GRADLE_INSTALL_DIR}/NOTICE
 
 # --- Download and Extract Maven ---
 ARG MAVEN_INSTALL_DIR=/opt/maven
@@ -42,7 +79,11 @@ RUN mkdir -p ${MAVEN_INSTALL_DIR} && \
     curl -L "https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o /tmp/maven.tar.gz && \
     tar -xzf /tmp/maven.tar.gz -C /tmp && \
     mv /tmp/apache-maven-${MAVEN_VERSION}/* ${MAVEN_INSTALL_DIR}/ && \
-    rm -rf /tmp/maven.tar.gz /tmp/apache-maven-${MAVEN_VERSION}
+    rm -rf /tmp/maven.tar.gz /tmp/apache-maven-${MAVEN_VERSION} && \
+    # Clean up Maven
+    rm -rf ${MAVEN_INSTALL_DIR}/README.txt \
+           ${MAVEN_INSTALL_DIR}/LICENSE \
+           ${MAVEN_INSTALL_DIR}/NOTICE
 
 # --- Download and Extract JExtract ---
 ARG JEXTRACT_INSTALL_DIR=/opt/jextract
@@ -52,10 +93,8 @@ RUN mkdir -p ${JEXTRACT_INSTALL_DIR} && \
     mv /tmp/jextract-22/* ${JEXTRACT_INSTALL_DIR}/ && \
     rm -rf /tmp/jextract.tar.gz /tmp/jextract-22
 
-# --- Download Oracle JDKs ---
+# --- Download Oracle JDK 25 ONLY ---
 RUN curl -L "https://download.oracle.com/java/25/latest/jdk-25_linux-x64_bin.deb" -o /tmp/jdk-25.deb
-RUN curl -L "https://download.oracle.com/java/22/archive/jdk-22.0.2_linux-x64_bin.deb" -o /tmp/jdk-22.deb
-RUN curl -L "https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.deb" -o /tmp/jdk-21.deb
 
 # =================================================================================================
 # STAGE 2: Final Production Image
@@ -66,31 +105,40 @@ FROM nvcr.io/nvidia/tensorrt-llm/devel:${TRT_LLM_VERSION}
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 
-# --- 1. System Tools & Java UI Libs ---
-# Removed python3-pip/venv as requested (using base image's python)
+# --- 1. System Tools (Ordered by change frequency for better caching) ---
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    openssh-server sudo nano unzip rsync locales passwd \
-    git wget curl graphviz fontconfig man-db htop \
-    && rm -rf /var/lib/apt/lists/*
+    # Core system tools (rarely change)
+    openssh-server \
+    sudo \
+    nano \
+    unzip \
+    rsync \
+    locales \
+    passwd \
+    # Development tools
+    git \
+    wget \
+    curl \
+    graphviz \
+    fontconfig \
+    man-db \
+    htop \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
 
-# [FIX] Delete the marker file that blocks pip from working on system python
-# This allows 'pip install virtualenv' to succeed in your build_wheel.py script
+# Delete the marker file that blocks pip from working on system python
 RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
 
 RUN locale-gen en_US.UTF-8
 
-# --- 2. Install Oracle JDKs ---
+# --- 2. Install Oracle JDK 25 ---
 COPY --from=builder /tmp/jdk-25.deb /tmp/jdk-25.deb
-COPY --from=builder /tmp/jdk-22.deb /tmp/jdk-22.deb
-COPY --from=builder /tmp/jdk-21.deb /tmp/jdk-21.deb
 RUN dpkg -i /tmp/jdk-25.deb && \
-    dpkg -i /tmp/jdk-22.deb && \
-    dpkg -i /tmp/jdk-21.deb && \
-    rm -f /tmp/jdk-*.deb && \
+    rm -f /tmp/jdk-25.deb && \
     ln -s "$(find /usr/lib/jvm -maxdepth 1 -name 'jdk-25.*' -type d | head -n 1)" /usr/lib/jvm/jdk-25 && \
-    ln -s "$(find /usr/lib/jvm -maxdepth 1 -name 'jdk-22.*' -type d | head -n 1)" /usr/lib/jvm/jdk-22 && \
-    ln -s "$(find /usr/lib/jvm -maxdepth 1 -name 'jdk-21.*' -type d | head -n 1)" /usr/lib/jvm/jdk-21 && \
     ls -ld /usr/lib/jvm/jdk-25/bin/java
 
 # --- 3. Install Build Tools (Maven, Gradle, JExtract) ---
@@ -98,11 +146,11 @@ COPY --from=builder /opt/gradle /opt/gradle
 COPY --from=builder /opt/maven /opt/maven
 COPY --from=builder /opt/jextract /opt/jextract
 
-# --- 4. Install IntelliJ IDEA ---
+# --- 4. Install IntelliJ IDEA Remote Server ---
 ARG IDEA_INSTALL_DIR=/opt/jetbrains/idea
 COPY --from=builder ${IDEA_INSTALL_DIR} ${IDEA_INSTALL_DIR}
 
-# --- 5. Environment Configuration ---
+# --- 5. Environment Configuration (Changes less frequently, good for caching) ---
 ENV JAVA_HOME=/usr/lib/jvm/jdk-25
 ENV GRADLE_HOME=/opt/gradle
 ENV MAVEN_HOME=/opt/maven
@@ -110,12 +158,13 @@ ENV JEXTRACT_HOME=/opt/jextract
 
 ENV PATH="${JAVA_HOME}/bin:${GRADLE_HOME}/bin:${MAVEN_HOME}/bin:${JEXTRACT_HOME}/bin:${PATH}"
 
-# --- 6. SSH & User Configuration ---
+# --- 6. SSH Configuration (System-level, changes rarely) ---
 RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
     echo "PermitUserEnvironment yes" >> /etc/ssh/sshd_config && \
     mkdir -p /var/run/sshd && \
     ssh-keygen -A
 
+# --- 7. User Configuration (Changes rarely) ---
 RUN (userdel -r ubuntu 2>/dev/null || true) && \
     (groupdel ubuntu 2>/dev/null || true) && \
     groupadd -g 1000 developer && \
@@ -124,7 +173,7 @@ RUN (userdel -r ubuntu 2>/dev/null || true) && \
     usermod -aG sudo developer && \
     echo '%developer ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# --- 7. Environment Inheritance ---
+# --- 8. Environment Inheritance (System-wide environment) ---
 RUN echo "export PATH=${PATH}" >> /etc/profile && \
     echo "export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> /etc/profile && \
     echo "export CUDA_HOME=${CUDA_HOME}" >> /etc/profile && \
@@ -134,7 +183,7 @@ RUN echo "export PATH=${PATH}" >> /etc/profile && \
     echo "export GRADLE_HOME=${GRADLE_HOME}" >> /etc/profile && \
     echo "export MAVEN_HOME=${MAVEN_HOME}" >> /etc/profile
 
-# --- 8. Register IDE Backend ---
+# --- 9. Register IDE Backend (User-specific configuration) ---
 USER developer
 WORKDIR /home/developer
 
@@ -145,11 +194,12 @@ RUN echo "export SSH_AUTH_SOCK=/ssh-agent" > ~/.bashrc_temp && \
     touch /home/developer/.hushlogin && \
     ${IDEA_INSTALL_DIR}/bin/remote-dev-server.sh registerBackendLocationForGateway
 
-# --- 9. Final Entrypoint Setup ---
+# --- 10. Final Setup ---
 USER root
 
 RUN mkdir -p /code && chown developer:developer /code
 
+# Copy entrypoint last (changes most frequently for better layer caching)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
