@@ -23,31 +23,11 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# --- Download and Extract IntelliJ IDEA Ultimate (Remote Server Only) ---
+# --- Download and Extract IntelliJ IDEA Ultimate ---
 ARG IDEA_INSTALL_DIR=/opt/jetbrains/idea
 RUN mkdir -p ${IDEA_INSTALL_DIR}
 RUN curl -L "https://download.jetbrains.com/idea/ideaIU-${IDEA_VERSION}.tar.gz" | \
-    tar -xz -C ${IDEA_INSTALL_DIR} --strip-components=1 && \
-    cd ${IDEA_INSTALL_DIR} && \
-    find plugins/ -mindepth 1 -maxdepth 1 ! -name 'java' \
-                                          ! -name 'java-ide-customization' \
-                                          ! -name 'gradle' \
-                                          ! -name 'gradle-java' \
-                                          ! -name 'maven' \
-                                          ! -name 'remote-dev-server' \
-                                          ! -name 'git4idea' \
-                                          -exec rm -rf {} + 2>/dev/null || true && \
-    rm -rf jbr/lib/libjavafx*.* 2>/dev/null || true && \
-    rm -rf lib/src.zip \
-           lib/*.zip 2>/dev/null || true && \
-    rm -rf license/ \
-           Install-Linux-tar.txt \
-           build.txt 2>/dev/null || true && \
-    find plugins/ -name "*-src.jar" -delete 2>/dev/null || true && \
-    find plugins/ -name "sources.jar" -delete 2>/dev/null || true && \
-    find . -name "*.pdf" -delete 2>/dev/null || true && \
-    find . -name "*.md" -delete 2>/dev/null || true && \
-    find . -name "*.html" -delete 2>/dev/null || true
+    tar -xz -C ${IDEA_INSTALL_DIR} --strip-components=1
 
 # --- Download and Extract Gradle (bin distribution only) ---
 ARG GRADLE_INSTALL_DIR=/opt/gradle
@@ -72,6 +52,7 @@ RUN mkdir -p ${MAVEN_INSTALL_DIR} && \
     tar -xzf /tmp/maven.tar.gz -C /tmp && \
     mv /tmp/apache-maven-${MAVEN_VERSION}/* ${MAVEN_INSTALL_DIR}/ && \
     rm -rf /tmp/maven.tar.gz /tmp/apache-maven-${MAVEN_VERSION} && \
+    # Clean up Maven
     rm -rf ${MAVEN_INSTALL_DIR}/README.txt \
            ${MAVEN_INSTALL_DIR}/LICENSE \
            ${MAVEN_INSTALL_DIR}/NOTICE
@@ -99,7 +80,6 @@ ENV TZ=Etc/UTC
 # --- 1. System Tools (Ordered by change frequency for better caching) ---
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    # Core system tools (rarely change)
     openssh-server \
     sudo \
     nano \
