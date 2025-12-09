@@ -92,11 +92,13 @@ jobs:
       - name: Check Java Version
         run: |
           docker run --rm \
-            ghcr.io/${{ github.repository_owner }}/java-trtllm-devel:latest \
-            java -version
+          --entrypoint /bin/bash \
+          ghcr.io/${{ github.repository_owner }}/java-trtllm-devel:latest \
+          -c "java -version"
 
       - name: Verify Environment
         run: |
           docker run --rm \
+            --entrypoint /bin/bash \
             ghcr.io/${{ github.repository_owner }}/java-trtllm-devel:latest \
-            bash -c "echo 'Displaying OS info...' && cat /etc/os-release"
+            -c "echo 'Displaying OS info...' && cat /etc/os-release"
