@@ -28,9 +28,7 @@ ARG IDEA_INSTALL_DIR=/opt/jetbrains/idea
 RUN mkdir -p ${IDEA_INSTALL_DIR}
 RUN curl -L "https://download.jetbrains.com/idea/ideaIU-${IDEA_VERSION}.tar.gz" | \
     tar -xz -C ${IDEA_INSTALL_DIR} --strip-components=1 && \
-    # Remove UI-related components (keep only remote-dev-server)
     cd ${IDEA_INSTALL_DIR} && \
-    # Remove all plugins except essential ones for remote development
     find plugins/ -mindepth 1 -maxdepth 1 ! -name 'java' \
                                           ! -name 'java-ide-customization' \
                                           ! -name 'gradle' \
@@ -39,22 +37,16 @@ RUN curl -L "https://download.jetbrains.com/idea/ideaIU-${IDEA_VERSION}.tar.gz" 
                                           ! -name 'remote-dev-server' \
                                           ! -name 'git4idea' \
                                           -exec rm -rf {} + 2>/dev/null || true && \
-    # Remove unnecessary binaries and UI components
-    rm -rf jbr/lib/libawt_xawt.* \
-           jbr/lib/libfontmanager.* \
-           jbr/lib/libjavafx*.* \
-           jbr/lib/libjawt.* \
-           lib/src.zip \
-           lib/*.zip \
-           license/ \
+    rm -rf jbr/lib/libjavafx*.* 2>/dev/null || true && \
+    rm -rf lib/src.zip \
+           lib/*.zip 2>/dev/null || true && \
+    rm -rf license/ \
            Install-Linux-tar.txt \
-           build.txt && \
-    # Remove source JARs from remaining plugins
-    find plugins/ -name "*-src.jar" -delete && \
-    find plugins/ -name "sources.jar" -delete && \
-    # Remove documentation
-    find . -name "*.pdf" -delete && \
-    find . -name "*.md" -delete && \
+           build.txt 2>/dev/null || true && \
+    find plugins/ -name "*-src.jar" -delete 2>/dev/null || true && \
+    find plugins/ -name "sources.jar" -delete 2>/dev/null || true && \
+    find . -name "*.pdf" -delete 2>/dev/null || true && \
+    find . -name "*.md" -delete 2>/dev/null || true && \
     find . -name "*.html" -delete 2>/dev/null || true
 
 # --- Download and Extract Gradle (bin distribution only) ---
@@ -80,7 +72,6 @@ RUN mkdir -p ${MAVEN_INSTALL_DIR} && \
     tar -xzf /tmp/maven.tar.gz -C /tmp && \
     mv /tmp/apache-maven-${MAVEN_VERSION}/* ${MAVEN_INSTALL_DIR}/ && \
     rm -rf /tmp/maven.tar.gz /tmp/apache-maven-${MAVEN_VERSION} && \
-    # Clean up Maven
     rm -rf ${MAVEN_INSTALL_DIR}/README.txt \
            ${MAVEN_INSTALL_DIR}/LICENSE \
            ${MAVEN_INSTALL_DIR}/NOTICE
@@ -129,12 +120,11 @@ RUN apt-get update && \
     && rm -rf /tmp/* \
     && rm -rf /var/tmp/*
 
-# Delete the marker file that blocks pip from working on system python
 RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
 
 RUN locale-gen en_US.UTF-8
 
-# --- 2. Install Oracle JDK 25 ---
+# --- 2. Install Oracle JDK 25 ONLY (Keep full installation) ---
 COPY --from=builder /tmp/jdk-25.deb /tmp/jdk-25.deb
 RUN dpkg -i /tmp/jdk-25.deb && \
     rm -f /tmp/jdk-25.deb && \
@@ -199,7 +189,6 @@ USER root
 
 RUN mkdir -p /code && chown developer:developer /code
 
-# Copy entrypoint last (changes most frequently for better layer caching)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
